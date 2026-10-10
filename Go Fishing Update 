@@ -1,0 +1,189 @@
+--// Services
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local player = Players.LocalPlayer
+
+--// Events
+local fishingEvents = ReplicatedStorage:WaitForChild("events"):WaitForChild("fishing")
+local targetTap = fishingEvents:WaitForChild("targetTap")
+local fightClick = fishingEvents:WaitForChild("fightClick")
+local startFight = fishingEvents:WaitForChild("startFight")
+local guiEvents = ReplicatedStorage:WaitForChild("events"):WaitForChild("gui")
+local canUseItem = guiEvents:WaitForChild("canUseItem")
+
+--// Config
+getgenv().AutoTap = false
+getgenv().AutoFight = false
+getgenv().AutoStartFight = false
+getgenv().TapDelay = 0.2
+getgenv().FightDelay = 0.3
+getgenv().StartFightDelay = 0.5
+
+local potions = {"Strength Potion III","Speed Potion III","Luck Potion III","Automerge Potion III"}
+local selectedPotion = potions[1]
+local autoPotion = false
+local potionDelay = 1 -- ⏱️ delay potion jadi 1 detik
+
+--// GUI
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.ResetOnSpawn = false
+ScreenGui.Parent = gethui and gethui() or game.CoreGui
+
+local Frame = Instance.new("Frame", ScreenGui)
+Frame.Size = UDim2.new(0, 160, 0, 160) -- ⚡ diperkecil
+Frame.Position = UDim2.new(0.05,0,0.25,0)
+Frame.BackgroundColor3 = Color3.fromRGB(28,28,38)
+Frame.Active, Frame.Draggable = true, true
+Instance.new("UICorner", Frame).CornerRadius = UDim.new(0,8)
+
+local Title = Instance.new("TextLabel", Frame)
+Title.Size = UDim2.new(1,0,0,18)
+Title.BackgroundTransparency = 1
+Title.Font = Enum.Font.GothamBold
+Title.TextSize = 13
+Title.TextColor3 = Color3.fromRGB(0,255,180)
+Title.Text = "🎣 Fishing Hub"
+
+-- Helper: Toggle
+local function createToggle(text,posY,stateName)
+    local btn = Instance.new("TextButton", Frame)
+    btn.Size = UDim2.new(0.45,0,0,18)
+    btn.Position = UDim2.new(0.05,0,posY,0)
+    btn.Text = text.." OFF"
+    btn.Font = Enum.Font.GothamBold
+    btn.TextSize = 10
+    btn.TextColor3 = Color3.fromRGB(255,255,255)
+    btn.BackgroundColor3 = Color3.fromRGB(45,45,65)
+    Instance.new("UICorner", btn).CornerRadius = UDim.new(0,5)
+    btn.MouseButton1Click:Connect(function()
+        getgenv()[stateName] = not getgenv()[stateName]
+        btn.Text = text.." "..(getgenv()[stateName] and "ON" or "OFF")
+    end)
+end
+
+-- Helper: Box
+local function createBox(posY,valueName,default)
+    local box = Instance.new("TextBox", Frame)
+    box.Size = UDim2.new(0.4,0,0,18)
+    box.Position = UDim2.new(0.55,0,posY,0)
+    box.Text = tostring(default)
+    box.PlaceholderText = "Delay"
+    box.Font = Enum.Font.Gotham
+    box.TextSize = 10
+    box.TextColor3 = Color3.fromRGB(255,255,255)
+    box.BackgroundColor3 = Color3.fromRGB(40,40,60)
+    Instance.new("UICorner", box).CornerRadius = UDim.new(0,5)
+    box.ClearTextOnFocus = false
+    box.FocusLost:Connect(function()
+        local n = tonumber(box.Text)
+        if n then getgenv()[valueName] = n end
+        box.Text = tostring(getgenv()[valueName])
+    end)
+end
+
+-- Toggles
+createToggle("Tap",0.2,"AutoTap")
+createBox(0.2,"TapDelay",getgenv().TapDelay)
+
+createToggle("Fight",0.4,"AutoFight")
+createBox(0.4,"FightDelay",getgenv().FightDelay)
+
+createToggle("StartFight",0.6,"AutoStartFight")
+createBox(0.6,"StartFightDelay",getgenv().StartFightDelay)
+
+-- Potion Selector
+local PotionBtn = Instance.new("TextButton", Frame)
+PotionBtn.Size = UDim2.new(0.9,0,0,18)
+PotionBtn.Position = UDim2.new(0.05,0,0.78,0)
+PotionBtn.Text = "Potion: "..selectedPotion
+PotionBtn.Font = Enum.Font.GothamBold
+PotionBtn.TextSize = 10
+PotionBtn.TextColor3 = Color3.fromRGB(255,255,255)
+PotionBtn.BackgroundColor3 = Color3.fromRGB(50,50,70)
+Instance.new("UICorner", PotionBtn).CornerRadius = UDim.new(0,5)
+
+local index = 1
+PotionBtn.MouseButton1Click:Connect(function()
+    index = index + 1
+    if index > #potions then index = 1 end
+    selectedPotion = potions[index]
+    PotionBtn.Text = "Potion: "..selectedPotion
+end)
+
+local AutoPotionBtn = Instance.new("TextButton", Frame)
+AutoPotionBtn.Size = UDim2.new(0.9,0,0,18)
+AutoPotionBtn.Position = UDim2.new(0.05,0,0.9,0)
+AutoPotionBtn.Text = "Potion Auto: OFF"
+AutoPotionBtn.Font = Enum.Font.GothamBold
+AutoPotionBtn.TextSize = 10
+AutoPotionBtn.TextColor3 = Color3.fromRGB(255,255,255)
+AutoPotionBtn.BackgroundColor3 = Color3.fromRGB(70,70,90)
+Instance.new("UICorner", AutoPotionBtn).CornerRadius = UDim.new(0,5)
+
+AutoPotionBtn.MouseButton1Click:Connect(function()
+    autoPotion = not autoPotion
+    AutoPotionBtn.Text = "Potion Auto: "..(autoPotion and "ON" or "OFF")
+end)
+
+-- Hide Button
+local HideBtn = Instance.new("TextButton", ScreenGui)
+HideBtn.Size = UDim2.new(0,45,0,16)
+HideBtn.Position = UDim2.new(0.05,0,0.22,0)
+HideBtn.Text = "Hide"
+HideBtn.Font = Enum.Font.GothamBold
+HideBtn.TextSize = 9
+HideBtn.TextColor3 = Color3.fromRGB(255,255,255)
+HideBtn.BackgroundColor3 = Color3.fromRGB(70,70,90)
+Instance.new("UICorner", HideBtn).CornerRadius = UDim.new(0,4)
+HideBtn.Active, HideBtn.Draggable = true, true
+
+local hidden = false
+HideBtn.MouseButton1Click:Connect(function()
+    hidden = not hidden
+    Frame.Visible = not hidden
+    HideBtn.Text = hidden and "Show" or "Hide"
+end)
+
+-- Loops AutoTap
+task.spawn(function()
+    while task.wait(getgenv().TapDelay) do
+        if getgenv().AutoTap then
+            pcall(function()
+                targetTap:InvokeServer()
+            end)
+        end
+    end
+end)
+
+-- Loops AutoFight
+task.spawn(function()
+    while task.wait(getgenv().FightDelay) do
+        if getgenv().AutoFight then
+            pcall(function()
+                fightClick:FireServer()
+            end)
+        end
+    end
+end)
+
+-- Loops AutoStartFight
+task.spawn(function()
+    while task.wait(getgenv().StartFightDelay) do
+        if getgenv().AutoStartFight then
+            pcall(function()
+                startFight:InvokeServer()
+            end)
+        end
+    end
+end)
+
+-- Loops AutoPotion
+task.spawn(function()
+    while task.wait(potionDelay) do
+        if autoPotion then
+            pcall(function()
+                canUseItem:InvokeServer(selectedPotion,"potions")
+            end)
+        end
+    end
+end)
